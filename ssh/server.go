@@ -64,7 +64,7 @@ type ServerConfig struct {
 	// Config contains configuration shared between client and server.
 	Config
 
-	hostKeys []Signer
+	hostKeys []hostKeySigner
 
 	// NoClientAuth is true if clients are allowed to connect without
 	// authenticating.
@@ -123,8 +123,41 @@ type ServerConfig struct {
 // key exists with the same algorithm, it is overwritten. Each server
 // config must have at least one host key.
 func (s *ServerConfig) AddHostKey(key Signer) {
+	keyType := key.PublicKey().Type()
+	switch keyType {
+	case KeyAlgoRSA, KeyAlgoRSASHA2256, KeyAlgoRSASHA2512:
+		if algorithmSigner, ok := key.(AlgorithmSigner); ok {
+			s.addHostKey(hostKeySigner{&rsaSigner{
+				algorithmSigner, SigAlgoRSA,
+			}, KeyAlgoRSA})
+			s.addHostKey(hostKeySigner{&rsaSigner{
+				algorithmSigner, SigAlgoRSASHA2256,
+			}, KeyAlgoRSASHA2256})
+			s.addHostKey(hostKeySigner{&rsaSigner{
+				algorithmSigner, SigAlgoRSASHA2512,
+			}, KeyAlgoRSASHA2512})
+			return
+		}
+	case CertAlgoRSAv01, CertAlgoRSASHA2256v01, CertAlgoRSASHA2512v01:
+		if algorithmSigner, ok := key.(AlgorithmSigner); ok {
+			s.addHostKey(hostKeySigner{&rsaSigner{
+				algorithmSigner, SigAlgoRSA,
+			}, CertAlgoRSAv01})
+			s.addHostKey(hostKeySigner{&rsaSigner{
+				algorithmSigner, SigAlgoRSASHA2256,
+			}, CertAlgoRSASHA2256v01})
+			s.addHostKey(hostKeySigner{&rsaSigner{
+				algorithmSigner, SigAlgoRSASHA2512,
+			}, CertAlgoRSASHA2512v01})
+			return
+		}
+	}
+	s.addHostKey(hostKeySigner{key, keyType})
+}
+
+func (s *ServerConfig) addHostKey(key hostKeySigner) {
 	for i, k := range s.hostKeys {
-		if k.PublicKey().Type() == key.PublicKey().Type() {
+		if k.algorithm == key.algorithm {
 			s.hostKeys[i] = key
 			return
 		}
@@ -289,8 +322,8 @@ var serverSigAlgs = []string{
 	CertAlgoECDSA256v01,
 	CertAlgoSKED25519v01,
 	CertAlgoSKECDSA256v01,
-	//"rsa-sha2-512-cert-v01@openssh.com",
-	//"rsa-sha2-256-cert-v01@openssh.com",
+	CertAlgoRSASHA2512v01,
+	CertAlgoRSASHA2256v01,
 	CertAlgoRSAv01,
 	CertAlgoDSAv01,
 	KeyAlgoSKED25519,
@@ -299,8 +332,8 @@ var serverSigAlgs = []string{
 	KeyAlgoECDSA521,
 	KeyAlgoECDSA384,
 	KeyAlgoECDSA256,
-	//SigAlgoRSASHA2512,
-	//SigAlgoRSASHA2256,
+	KeyAlgoRSASHA2512,
+	KeyAlgoRSASHA2256,
 	KeyAlgoRSA,
 	KeyAlgoDSA,
 }

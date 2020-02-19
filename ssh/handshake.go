@@ -37,6 +37,14 @@ type keyingTransport interface {
 	prepareKeyChange(*algorithms, *kexResult) error
 }
 
+// hostKeySigner contains a Signer and an associate algorithm. There
+// can be multiple algorithms for a given key Type() so we have to
+// store the algorithm separately.
+type hostKeySigner struct {
+	signer    Signer
+	algorithm string
+}
+
 // handshakeTransport implements rekeying on top of a keyingTransport
 // and offers a thread-safe writePacket() interface.
 type handshakeTransport struct {
@@ -49,7 +57,7 @@ type handshakeTransport struct {
 	// hostKeys is non-empty if we are the server. In that case,
 	// it contains all host keys that can be used to sign the
 	// connection.
-	hostKeys []Signer
+	hostKeys []hostKeySigner
 
 	// hostKeyAlgorithms is non-empty if we are the client. In that case,
 	// we accept these key types from the server as host key.
@@ -458,8 +466,7 @@ func (t *handshakeTransport) sendKexInit() error {
 
 	if len(t.hostKeys) > 0 {
 		for _, k := range t.hostKeys {
-			msg.ServerHostKeyAlgos = append(
-				msg.ServerHostKeyAlgos, k.PublicKey().Type())
+			msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, k.algorithm)
 		}
 	} else {
 		msg.ServerHostKeyAlgos = t.hostKeyAlgorithms
@@ -633,8 +640,8 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 func (t *handshakeTransport) server(kex kexAlgorithm, algs *algorithms, magics *handshakeMagics) (*kexResult, error) {
 	var hostKey Signer
 	for _, k := range t.hostKeys {
-		if algs.hostKey == k.PublicKey().Type() {
-			hostKey = k
+		if algs.hostKey == k.algorithm {
+			hostKey = k.signer
 		}
 	}
 
@@ -653,7 +660,7 @@ func (t *handshakeTransport) client(kex kexAlgorithm, algs *algorithms, magics *
 		return nil, err
 	}
 
-	if err := verifyHostKeySignature(hostKey, result); err != nil {
+	if err := verifyHostKeySignature(hostKey, algs.hostKey, result); err != nil {
 		return nil, err
 	}
 
