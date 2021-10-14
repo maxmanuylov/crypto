@@ -282,11 +282,34 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 	return perms, err
 }
 
+var serverSigAlgs = []string{
+	CertAlgoED25519v01,
+	CertAlgoECDSA521v01,
+	CertAlgoECDSA384v01,
+	CertAlgoECDSA256v01,
+	CertAlgoSKED25519v01,
+	CertAlgoSKECDSA256v01,
+	//"rsa-sha2-512-cert-v01@openssh.com",
+	//"rsa-sha2-256-cert-v01@openssh.com",
+	CertAlgoRSAv01,
+	CertAlgoDSAv01,
+	KeyAlgoSKED25519,
+	KeyAlgoSKECDSA256,
+	KeyAlgoED25519,
+	KeyAlgoECDSA521,
+	KeyAlgoECDSA384,
+	KeyAlgoECDSA256,
+	//SigAlgoRSASHA2512,
+	//SigAlgoRSASHA2256,
+	KeyAlgoRSA,
+	KeyAlgoDSA,
+}
+
 func isAcceptableAlgo(algo string) bool {
-	switch algo {
-	case KeyAlgoRSA, KeyAlgoDSA, KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521, KeyAlgoSKECDSA256, KeyAlgoED25519, KeyAlgoSKED25519,
-		CertAlgoRSAv01, CertAlgoDSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoSKECDSA256v01, CertAlgoED25519v01, CertAlgoSKED25519v01:
-		return true
+	for _, alg := range serverSigAlgs {
+		if algo == alg {
+			return true
+		}
 	}
 	return false
 }

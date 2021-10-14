@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -551,6 +552,14 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		magics.serverKexInit = otherInitPacket
 	}
 
+	extInfo := false
+	for _, algo := range clientInit.KexAlgos {
+		if algo == "ext-info-c" {
+			extInfo = true
+			break
+		}
+	}
+
 	var err error
 	t.algorithms, err = findAgreedAlgorithms(isClient, clientInit, serverInit)
 	if err != nil {
@@ -601,6 +610,16 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 	}
 	if err = t.conn.writePacket([]byte{msgNewKeys}); err != nil {
 		return err
+	}
+	if extInfo {
+		msg := &extInfoMsg{
+			NumberExtensions: 1,
+			Name:             "server-sig-algs",
+			Value:            strings.Join(serverSigAlgs, ","),
+		}
+		if err = t.conn.writePacket(Marshal(msg)); err != nil {
+			return err
+		}
 	}
 	if packet, err := t.conn.readPacket(); err != nil {
 		return err

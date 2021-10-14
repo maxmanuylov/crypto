@@ -141,6 +141,15 @@ type serviceAcceptMsg struct {
 	Service string `sshtype:"6"`
 }
 
+// See RFC 8308, section 2.3.
+const msgExtInfo = 7
+
+type extInfoMsg struct {
+	NumberExtensions uint32 `sshtype:"7"`
+	Name             string
+	Value            string
+}
+
 // See RFC 4252, section 5.
 const msgUserAuthRequest = 50
 
