@@ -73,6 +73,8 @@ type handshakeTransport struct {
 	sentInitMsg    *kexInitMsg
 	pendingPackets [][]byte // Used when a key exchange is in progress.
 
+	extInfoSent bool
+
 	// If the read loop wants to schedule a kex, it pings this
 	// channel, and the write loop will send out a kex
 	// message.
@@ -559,10 +561,10 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		magics.serverKexInit = otherInitPacket
 	}
 
-	extInfo := false
+	extInfoRequested := false
 	for _, algo := range clientInit.KexAlgos {
 		if algo == "ext-info-c" {
-			extInfo = true
+			extInfoRequested = true
 			break
 		}
 	}
@@ -618,7 +620,7 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 	if err = t.conn.writePacket([]byte{msgNewKeys}); err != nil {
 		return err
 	}
-	if extInfo {
+	if extInfoRequested && !t.extInfoSent {
 		msg := &extInfoMsg{
 			NumberExtensions: 1,
 			Name:             "server-sig-algs",
@@ -627,6 +629,7 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		if err = t.conn.writePacket(Marshal(msg)); err != nil {
 			return err
 		}
+		t.extInfoSent = true
 	}
 	if packet, err := t.conn.readPacket(); err != nil {
 		return err
